@@ -1,0 +1,9 @@
+node_modules
+dist
+public/models/*.glb
+public/models/*.gltf
+public/models/*.obj
+public/models/*.mtl
+public/models/*.usd
+public/models/*.usda
+public/models/*.usdz
