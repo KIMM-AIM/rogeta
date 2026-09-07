@@ -7,6 +7,7 @@ import { MTLLoader } from 'three/addons/loaders/MTLLoader.js'
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js'
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
 import { resolvePreview } from '../data/config'
+import { createPreviewJoints } from '../data/previewJoints'
 
 function fitObject(object, camera, controls) {
   const box = new THREE.Box3().setFromObject(object)
@@ -71,6 +72,15 @@ export default function PreviewViewer({ asset, onPreview }) {
   const onPreviewRef = useRef(onPreview)
   onPreviewRef.current = onPreview
   const [status, setStatus] = useState('loading')
+  const [jointControls, setJointControls] = useState([])
+  const jointTargetsRef = useRef([])
+  const interactedRef = useRef(false)
+
+  const changeJoint = (index, value) => {
+    interactedRef.current = true
+    jointTargetsRef.current[index] = value / 100
+    setJointControls((current) => current.map((joint, i) => i === index ? { ...joint, value } : joint))
+  }
 
   useEffect(() => {
     const el = mountRef.current
@@ -83,6 +93,12 @@ export default function PreviewViewer({ asset, onPreview }) {
     let controls
     let frame
     let model
+    let joints = []
+    let amounts = []
+    let previousTime
+    jointTargetsRef.current = []
+    interactedRef.current = false
+    setJointControls([])
 
     scene = new THREE.Scene()
     scene.background = new THREE.Color(0x151a17)
@@ -114,8 +130,17 @@ export default function PreviewViewer({ asset, onPreview }) {
     const observer = new ResizeObserver(resize)
     observer.observe(el)
 
-    const tick = () => {
+    const tick = (time = 0) => {
       frame = requestAnimationFrame(tick)
+      const dt = previousTime === undefined ? 0 : Math.min((time - previousTime) / 1000, 0.1)
+      previousTime = time
+      joints.forEach((joint, index) => {
+        const target = jointTargetsRef.current[index] || 0
+        amounts[index] = THREE.MathUtils.damp(amounts[index], target, 12, dt)
+        if (Math.abs(amounts[index] - target) < 0.0001) amounts[index] = target
+        joint.setOpen(amounts[index])
+      })
+      if (interactedRef.current) controls.autoRotate = false
       controls.update()
       renderer.render(scene, camera)
     }
@@ -134,6 +159,10 @@ export default function PreviewViewer({ asset, onPreview }) {
       try {
         model = await loadModel(preview.url, preview.ext, preview.dir)
         if (cancelled) return
+        joints = createPreviewJoints(model, asset.id)
+        amounts = joints.map(() => 0)
+        jointTargetsRef.current = joints.map(() => 0)
+        setJointControls(joints.map((joint) => ({ label: joint.label, value: 0 })))
         scene.add(model)
         fitObject(model, camera, controls)
         setStatus('ready')
@@ -164,6 +193,22 @@ export default function PreviewViewer({ asset, onPreview }) {
   return (
     <div className="viewer-stage">
       <div ref={mountRef} className="viewer-canvas" />
+      {status === 'ready' && jointControls.length > 0 && (
+        <div className="joint-controls" role="group" aria-label="Open and close doors">
+          {jointControls.map((joint, index) => (
+            <div className="joint-control" key={`${asset.id}-${joint.label}`}>
+              <label htmlFor={`joint-${asset.id}-${index}`}>{joint.label}</label>
+              <button type="button" onClick={() => changeJoint(index, joint.value > 0 ? 0 : 100)}>
+                {joint.value > 0 ? 'Close' : 'Open'}
+              </button>
+              <input id={`joint-${asset.id}-${index}`} type="range" min="0" max="100" step="1"
+                value={joint.value} aria-valuetext={`${joint.value}% open`}
+                onChange={(event) => changeJoint(index, Number(event.target.value))} />
+              <output htmlFor={`joint-${asset.id}-${index}`}>{joint.value}%</output>
+            </div>
+          ))}
+        </div>
+      )}
       {status !== 'ready' && (
         <div className="placeholder overlay">
           <Box size={52} />
