@@ -31,7 +31,20 @@ function loadModel(url, ext, resourcePath) {
       return
     }
     if (ext === 'fbx') {
-      new FBXLoader().setResourcePath(resourcePath).load(url, resolve, undefined, reject)
+      new FBXLoader().setResourcePath(resourcePath).load(url, (object) => {
+        object.traverse((child) => {
+          if (!child.isMesh) return
+          const materials = Array.isArray(child.material) ? child.material : [child.material]
+          materials.forEach((material) => {
+            // FBX vertex colors can contain labels that tint the surface texture.
+            if (material?.map && material.vertexColors) {
+              material.vertexColors = false
+              material.needsUpdate = true
+            }
+          })
+        })
+        resolve(object)
+      }, undefined, reject)
       return
     }
     if (ext === 'obj') {
