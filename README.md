@@ -21,8 +21,8 @@ OBJ, and FBX. Files are resolved relative to `public/models/` while
 `PUBLISH.online` is false. This setting selects the asset host; it does not
 control whether the website itself is public.
 
-The included preview is `public/models/Eumm_ENV.fbx`. Its referenced texture
-images are not supplied yet, so surface appearance is incomplete. Simulation
+The included preview is `public/models/OBJ_app_01.fbx`. Its referenced texture
+`T_OBJECT_app_01.png` is included alongside the model. Simulation
 sources and other local datasets are not included in this repository.
 
 Hugging Face is not connected yet. Keep `online: false` until actual dataset
